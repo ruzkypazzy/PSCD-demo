@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PSCD — Pharos Symbol Collision Detector (live demo)</title>
+<meta name="description" content="Live in-browser demo of PSCD — checks whether a candidate ERC-20 symbol is already taken on Pharos Pacific mainnet. RPC-only, no backend." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23fff5e1'/%3E%3Ctext y='24' x='5' font-size='18' fill='%23c2410c' font-family='Georgia,serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E" />
+<style>
+:root {
+  /* token-card / collector theme — warm cream paper, dark ink, accent ribbon */
+  --paper:        #f7f1e3;
+  --paper-2:      #efe7d2;
+  --paper-3:      #e6dbc1;
+  --ink:          #1f1a14;
+  --ink-soft:     #4a4234;
+  --ink-faint:    #8a7e63;
+  --rule:         #c9b98a;
+  --rule-soft:    #ddd0a4;
+
+  --gold:         #b8860b;
+  --gold-soft:    #f5e6b3;
+  --ribbon-red:   #c2410c;
+  --ribbon-grn:   #15803d;
+  --ribbon-amb:   #b45309;
+  --red-soft:     #fde2da;
+  --green-soft:   #d8efd9;
+  --amber-soft:   #fbe7c2;
+
+  --shadow:       0 1px 0 rgba(31, 26, 20, 0.08), 0 6px 18px rgba(31, 26, 20, 0.06);
+  --shadow-hover: 0 1px 0 rgba(31, 26, 20, 0.10), 0 12px 28px rgba(31, 26, 20, 0.10);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 "Iowan Old Style", Georgia, "Times New Roman", serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(31,26,20,0.04) 1px, transparent 0);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+a { color: var(--ribbon-red); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 0.92em; }
+
+/* ============ topbar ============ */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(247, 241, 227, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+  padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+}
+.topbar .brand {
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 700; font-size: 16px;
+  font-family: "Iowan Old Style", Georgia, serif;
+  letter-spacing: 0.02em;
+}
+.topbar .brand .logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 6px;
+  background: linear-gradient(135deg, #fff5e1, #f5e6b3);
+  border: 1.5px solid var(--gold);
+  color: var(--ribbon-red);
+  font-family: Georgia, serif; font-size: 18px; font-weight: 800;
+  font-style: italic;
+}
+.topbar .brand .badge {
+  font-size: 11px; padding: 2px 8px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.topbar nav { display: flex; gap: 20px; }
+.topbar nav a { color: var(--ink-soft); font-size: 14px; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+.topbar nav a:hover { color: var(--ribbon-red); text-decoration: none; }
+
+/* ============ hero ============ */
+.hero {
+  text-align: center;
+  padding: 56px 24px 28px;
+  max-width: 720px; margin: 0 auto;
+}
+.hero h1 {
+  font-size: 44px; line-height: 1.05; margin: 0 0 14px;
+  font-weight: 700; letter-spacing: -0.01em;
+  font-style: italic;
+}
+.hero h1 .accent {
+  background: linear-gradient(135deg, var(--ribbon-red), var(--gold));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  font-style: italic;
+}
+.hero p { font-size: 17px; color: var(--ink-soft); margin: 0 0 4px; font-style: italic; }
+.hero .lede { font-size: 14px; color: var(--ink-faint); margin-top: 8px; }
+.hero .pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 18px; padding: 6px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-size: 13px; color: var(--ink-soft);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-style: normal;
+}
+.hero .pill .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ribbon-grn);
+  box-shadow: 0 0 6px rgba(21, 128, 61, 0.5);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ============ layout ============ */
+.container { max-width: 1180px; margin: 0 auto; padding: 16px 24px 80px; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 22px;
+}
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+.card:last-child { margin-bottom: 0; }
+.card::before {
+  /* corner ribbon */
+  content: "";
+  position: absolute; top: 0; left: 0;
+  width: 24px; height: 24px;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold) 50%, transparent 50%);
+  border-top-left-radius: 4px;
+}
+.card h2 {
+  margin: 0 0 14px; font-size: 13px; color: var(--ink);
+  font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.card h2 .badge {
+  display: inline-block; padding: 2px 8px; font-size: 10px; font-weight: 700;
+  border-radius: 3px; background: var(--ink); color: var(--paper);
+  font-family: ui-monospace, monospace; letter-spacing: 0.04em;
+}
+
+/* ============ form ============ */
+.form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.form-row label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); font-weight: 700; font-family: ui-sans-serif, system-ui, sans-serif; }
+.form-row input, .form-row select {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  padding: 12px 14px;
+  border-radius: 4px;
+  font-size: 15px;
+  font-family: "Iowan Old Style", Georgia, serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-row input[type="text"] { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; }
+.form-row input:focus, .form-row select:focus {
+  border-color: var(--ribbon-red);
+  box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.12);
+}
+.form-row .hint { font-size: 12px; color: var(--ink-faint); font-style: italic; }
+
+.btn {
+  background: var(--ink);
+  color: var(--paper);
+  border: 0; padding: 12px 22px;
+  border-radius: 4px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.btn:hover:not(:disabled) {
+  background: var(--ribbon-red);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.secondary { background: var(--paper-2); color: var(--ink); border: 1px solid var(--rule); }
+.btn.secondary:hover:not(:disabled) { background: var(--paper-3); color: var(--ink); transform: none; box-shadow: none; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.chip {
+  display: inline-block;
+  padding: 5px 11px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  margin: 0 4px 4px 0;
+  transition: all 0.15s;
+}
+.chip:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.presets { margin: 0 0 14px; padding-top: 10px; border-top: 1px dashed var(--rule-soft); }
+
+.status {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+.status.error { background: var(--red-soft); border-color: var(--ribbon-red); color: var(--ribbon-red); }
+.status .spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid var(--rule);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ chat ============ */
+.chat { display: flex; flex-direction: column; gap: 14px; max-height: 720px; overflow-y: auto; padding: 4px 4px 4px 0; }
+.msg { display: flex; gap: 12px; align-items: flex-start; }
+.msg .avatar {
+  flex: 0 0 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800;
+  font-family: Georgia, serif; font-style: italic;
+}
+.msg.user .avatar { background: var(--paper-2); color: var(--ink-soft); border: 1px solid var(--rule); }
+.msg.assistant .avatar { background: linear-gradient(135deg, var(--ribbon-red), var(--gold)); color: var(--paper); }
+.msg .bubble { background: var(--paper-2); padding: 14px 16px; border-radius: 6px; max-width: 100%; border: 1px solid var(--rule-soft); }
+.msg.user .bubble { background: var(--paper-3); border: 1px dashed var(--rule); }
+.msg p { margin: 0 0 8px; font-size: 14px; color: var(--ink); }
+.msg p:last-child { margin-bottom: 0; }
+.msg .meta { color: var(--ink-faint); font-size: 12px; margin-top: 4px; font-style: italic; }
+.msg.typing .bubble { color: var(--ink-faint); font-style: italic; }
+.msg.typing .bubble::after { content: "▎"; margin-left: 4px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ============ report inside chat ============ */
+.report {
+  margin-top: 10px;
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+.verdict-banner {
+  padding: 14px 18px;
+  border-radius: 4px;
+  font-size: 18px; font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid;
+  font-family: Georgia, serif;
+}
+.verdict-clear     { background: var(--green-soft); border-color: var(--ribbon-grn); color: var(--ribbon-grn); }
+.verdict-collision { background: var(--red-soft); border-color: var(--ribbon-red); color: var(--ribbon-red); }
+.verdict-empty     { background: var(--amber-soft); border-color: var(--ribbon-amb); color: var(--ribbon-amb); }
+
+.verdict-banner .vbig { font-size: 28px; font-weight: 800; }
+
+.report-headline {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--rule-soft);
+}
+.report-headline .meta-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px;
+  flex: 1; min-width: 220px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.report-headline .meta-item .k { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; font-weight: 700; }
+.report-headline .meta-item .v { color: var(--ink); font-family: ui-monospace, monospace; font-size: 13px; margin-top: 1px; }
+
+.collisions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+/* ============ token trading card (the main visual element) ============ */
+.token-card {
+  background: var(--paper);
+  border: 1.5px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s, box-shadow 0.15s;
+  font-family: "Iowan Old Style", Georgia, serif;
+}
+.token-card:hover {
+  transform: translateY(-2px) rotate(-0.2deg);
+  box-shadow: var(--shadow-hover);
+}
+.token-card .tc-stripe {
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--gold), var(--gold) 6px, var(--ribbon-red) 6px, var(--ribbon-red) 12px);
+}
+.token-card .tc-body {
+  padding: 16px 18px;
+}
+.token-card .tc-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+}
+.token-card .tc-symbol {
+  font-size: 28px; font-weight: 800; font-style: italic;
+  letter-spacing: 0.02em; color: var(--ribbon-red);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1;
+}
+.token-card .tc-name {
+  font-size: 14px; color: var(--ink-soft);
+  margin-top: 2px; font-style: italic;
+}
+.token-card .tc-seal {
+  flex: 0 0 auto;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--gold-soft);
+  border: 1.5px dashed var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800;
+  color: var(--ribbon-red);
+  text-align: center;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  transform: rotate(-8deg);
+}
+.token-card .tc-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-soft);
+  border-radius: 4px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+}
+.token-card .tc-grid .k { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; font-weight: 700; }
+.token-card .tc-grid .v { color: var(--ink); font-family: ui-monospace, monospace; margin-top: 1px; word-break: break-all; font-size: 11px; }
+.token-card .tc-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--rule-soft);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+}
+.token-card .tc-foot .explorer {
+  display: inline-block; padding: 4px 10px;
+  background: var(--ink); color: var(--paper);
+  border-radius: 3px;
+  font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+.token-card .tc-foot .explorer:hover { background: var(--ribbon-red); text-decoration: none; }
+.token-card .tc-foot .stamp {
+  font-style: italic; color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.empty-state {
+  text-align: center; padding: 36px 18px;
+  color: var(--ink-soft);
+  background: var(--green-soft);
+  border: 1.5px dashed var(--ribbon-grn);
+  border-radius: 8px;
+  font-style: italic;
+}
+.empty-state .check {
+  font-size: 56px; line-height: 1; color: var(--ribbon-grn); margin-bottom: 8px;
+  font-family: Georgia, serif;
+}
+.empty-state .ok-title {
+  font-size: 22px; font-weight: 800; font-style: normal; color: var(--ribbon-grn);
+  margin-bottom: 4px;
+  font-family: Georgia, serif;
+}
+.empty-state .ok-sub {
+  font-size: 13px; color: var(--ink-soft); font-style: normal; margin-top: 6px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.recommend {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--paper-2);
+  border-left: 3px solid var(--gold);
+  border-radius: 3px;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.recommend strong { color: var(--ribbon-red); font-style: normal; }
+
+/* ============ explainer card ============ */
+.explainer-card { font-size: 14px; }
+.explainer-card ol, .explainer-card ul { margin: 0; padding-left: 18px; color: var(--ink-soft); }
+.explainer-card ol li, .explainer-card ul li { margin-bottom: 4px; }
+.explainer-card code { font-size: 12px; padding: 1px 5px; background: var(--paper-2); border: 1px solid var(--rule-soft); border-radius: 3px; }
+.explainer-card p { color: var(--ink-soft); margin: 0 0 8px; }
+
+/* ============ footer ============ */
+.footer {
+  text-align: center;
+  padding: 32px 24px 48px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  border-top: 1px solid var(--rule);
+  margin-top: 32px;
+  font-style: italic;
+}
+.footer .repo-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 8px 12px;
+  color: var(--ribbon-red);
+  font-family: ui-monospace, monospace; font-size: 13px;
+  font-style: normal;
+}
+.footer .repo-link:hover { text-decoration: none; opacity: 0.85; }
+.footer .links { margin-top: 8px; }
+.footer .disclaimer { margin-top: 16px; font-size: 12px; color: var(--ink-faint); max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.6; font-style: normal; }
+
+@media (max-width: 600px) {
+  .hero h1 { font-size: 32px; }
+  .form-row input { font-size: 14px; }
+  .btn-row { flex-direction: column; }
+  .btn-row .btn { width: 100%; }
+  .report-headline .meta-grid { grid-template-columns: 1fr; }
+  .token-card .tc-head { flex-direction: column; }
+  .topbar { padding: 12px 16px; }
+  .topbar nav { gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">P</span>
+    <span class="title">Pharos Symbol Collision Detector</span>
+    <span class="badge">live demo</span>
+  </div>
+  <nav>
+    <a href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-" target="_blank" rel="noopener">↗ source</a>
+    <a href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-/blob/main/SKILL.md" target="_blank" rel="noopener">SKILL.md</a>
+    <a href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-#installation" target="_blank" rel="noopener">install</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1>Is your token symbol <span class="accent">already taken</span>?</h1>
+  <p>PSCD scans Pharos Pacific mainnet for ERC-20 collisions — paste a symbol, get a verdict.</p>
+  <p class="lede">One prompt. One answer: <em>CLEAR</em>, <em>COLLISION</em>, or <em>EMPTY</em>.</p>
+  <div class="pill"><span class="dot"></span> Live RPC · Pharos Pacific Mainnet (chain 1672)</div>
+</section>
+
+<main class="container">
+  <div class="grid">
+
+    <!-- LEFT: form + chat -->
+    <div>
+      <div class="card">
+        <h2>Check a symbol <span class="badge">1</span></h2>
+
+        <div class="form-row">
+          <label for="sym">Candidate symbol</label>
+          <input id="sym" type="text" placeholder="SKP  /  USDC  /  MOON  / …" autocomplete="off" spellcheck="false" maxlength="32" />
+          <div class="hint">Empty box. We fetch live — every run is a fresh RPC query, no caching.</div>
+        </div>
+
+        <div class="form-row">
+          <label for="depth">Scan depth</label>
+          <select id="depth">
+            <option value="5000" selected>Fast — last 5,000 blocks (~3 hours, ~5s)</option>
+            <option value="10000">Medium — last 10,000 blocks (~6 hours, ~10s)</option>
+            <option value="50000">Deep — last 50,000 blocks (~30 hours, ~32s)</option>
+            <option value="0">Full chain (~9.6M blocks, ~3 min)</option>
+          </select>
+        </div>
+
+        <div class="presets" id="presets">
+          <div style="font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-weight: 700;">Try a busy symbol</div>
+          <span class="chip" data-sym="USDC">USDC</span>
+          <span class="chip" data-sym="USDT">USDT</span>
+          <span class="chip" data-sym="SKP">SKP</span>
+          <span class="chip" data-sym="ZZZPSCDTEST">ZZZPSCDTEST</span>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn" id="run">⚡ Check symbol</button>
+          <button class="btn secondary" id="clear">Clear chat</button>
+          <a class="btn secondary" href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-" target="_blank" rel="noopener">↗ GitHub</a>
+        </div>
+
+        <div class="status" id="status" style="display:none;">
+          <span class="spinner" id="statusSpin"></span>
+          <span id="statusText">…</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Agent conversation <span class="badge">2</span></h2>
+        <div class="chat" id="chat">
+          <div class="msg assistant">
+            <div class="avatar">P</div>
+            <div class="bubble">
+              <p>Hi, I'm <strong>PSCD</strong> — a Pharos Agent Center skill. Give me a candidate token symbol and I'll tell you whether it's already taken on Pharos Pacific mainnet.</p>
+              <p>I scan the chain's mint events (<code>Transfer</code> from zero address), look up <code>symbol()</code> on every candidate contract, and return either <strong style="color: #15803d;">CLEAR</strong> or <strong style="color: #c2410c;">COLLISION</strong> — with the full collision list as on-chain "trading cards".</p>
+              <p>Try a chip below or type your own symbol.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: explainer -->
+    <div>
+      <div class="card explainer-card">
+        <h2>How it works</h2>
+        <p>One job: tell you whether your symbol is taken before you deploy.</p>
+        <ol>
+          <li><strong>Scan blocks</strong> via <code>eth_getLogs</code>, filtered to <code>Transfer</code> events with <code>topic1 = 0x0…0</code> (the canonical mint). Batched 1,000 blocks per call.</li>
+          <li><strong>Look up</strong> each unique token's <code>symbol()</code> (<code>0x95d89b41</code>), <code>name()</code>, and <code>decimals()</code> via <code>eth_call</code> in parallel.</li>
+          <li><strong>Decode</strong> the ABI-encoded string return values, normalize (case-insensitive, strip whitespace).</li>
+          <li><strong>Match</strong> against your candidate. Return collisions as a list of "trading cards".</li>
+        </ol>
+      </div>
+
+      <div class="card explainer-card">
+        <h2>Verdicts</h2>
+        <p>
+          <strong style="color: #15803d;">CLEAR</strong> — no token uses this symbol in the scanned range.<br>
+          <strong style="color: #c2410c;">COLLISION</strong> — one or more tokens share the symbol. Don't deploy without a rename.<br>
+          <strong style="color: #b45309;">EMPTY</strong> — you didn't provide a symbol.
+        </p>
+      </div>
+
+      <div class="card explainer-card">
+        <h2>Install as an agent skill</h2>
+        <p>PSCD ships as a Pharos Agent Center skill. Install it once and your agent can call the checker as a tool.</p>
+        <ol>
+          <li><code>git clone https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-</code></li>
+          <li>Copy <code>SKILL.md</code> into your agent's skill directory (e.g. <code>~/.pharos/skills/</code>).</li>
+          <li>Ask your agent: <em>"is SKP taken on Pharos?"</em></li>
+        </ol>
+        <p>The agent auto-loads <code>SKILL.md</code>, runs the bash or Python checker, and returns the same verdict + collision list you see above — exactly the JSON schema in <code>SKILL.md</code>.</p>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <div>
+    <a class="repo-link" href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-" target="_blank" rel="noopener">
+      github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD- ↗
+    </a>
+  </div>
+  <div class="links">
+    <a class="repo-link" href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-/blob/main/README.md" target="_blank" rel="noopener">README</a>
+    <a class="repo-link" href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-/blob/main/SKILL.md" target="_blank" rel="noopener">SKILL.md</a>
+    <a class="repo-link" href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-/blob/main/scripts/check.py" target="_blank" rel="noopener">check.py</a>
+    <a class="repo-link" href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-/tree/main/references" target="_blank" rel="noopener">specs</a>
+  </div>
+  <p class="disclaimer">
+    Live demo. Each scan makes fresh JSON-RPC calls to <code>https://rpc.pharos.xyz</code>.
+    Browser version uses a bounded range; for full chain audit run:
+    <code>bash scripts/check.sh SYMBOL --max-blocks 0</code> (~3 min).
+  </p>
+</footer>
+
+<script>
+// ============ Pharos RPC client (browser-side) ============
+const RPC = "https://rpc.pharos.xyz";
+
+async function rpc(method, params) {
+  const r = await fetch(RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+  });
+  if (!r.ok) throw new Error(`RPC HTTP ${r.status}`);
+  const j = await r.json();
+  if (j.error) throw new Error(`RPC ${j.error.code}: ${j.error.message}`);
+  return j.result;
+}
+
+const hexToInt = (h) => h ? parseInt(h, 16) : 0;
+const intToHex = (n) => "0x" + n.toString(16);
+
+const SELECTOR_SYMBOL   = "0x95d89b41";
+const SELECTOR_NAME     = "0x06fdde03";
+const SELECTOR_DECIMALS = "0x313ce567";
+const TOPIC_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const ZERO_TOPIC = "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+function decodeAbiString(raw) {
+  if (!raw || raw === "0x" || raw.length < 130) return "";
+  const body = raw.slice(2);
+  try {
+    const length = parseInt(body.slice(64, 128), 16);
+    if (length === 0) return "";
+    const dataStart = 128;
+    const dataEnd = dataStart + length * 2;
+    const bytes = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+      bytes[i] = parseInt(body.slice(dataStart + i*2, dataStart + i*2 + 2), 16);
+    }
+    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  } catch (e) { return ""; }
+}
+
+function decodeAbiUint8(raw) {
+  if (!raw || raw === "0x") return 18;
+  try {
+    const v = raw.slice(-2);
+    return parseInt(v, 16);
+  } catch (e) { return 18; }
+}
+
+function normalize(s) { return (s || "").trim().toUpperCase(); }
+
+// ============ scan ============
+async function scanTokens(fromBlock, toBlock, step, onProgress) {
+  const addrs = new Set();
+  let b = fromBlock;
+  let scanned = 0;
+  const total = toBlock - fromBlock + 1;
+  const t0 = Date.now();
+  while (b <= toBlock) {
+    const upper = Math.min(b + step - 1, toBlock);
+    try {
+      const logs = await rpc("eth_getLogs", [{
+        fromBlock: intToHex(b),
+        toBlock:   intToHex(upper),
+        topics:    [TOPIC_TRANSFER, ZERO_TOPIC],
+      }]) || [];
+      for (const log of logs) {
+        const a = (log.address || "").toLowerCase();
+        if (a) addrs.add(a);
+      }
+    } catch (e) { /* skip on error */ }
+    scanned += (upper - b + 1);
+    if (onProgress) {
+      const pct = 100 * scanned / total;
+      const elapsed = (Date.now() - t0) / 1000;
+      const rate = scanned / elapsed || 0;
+      const eta = (total - scanned) / rate;
+      onProgress({ scanned, total, pct, tokens: addrs.size, eta });
+    }
+    b = upper + 1;
+  }
+  return Array.from(addrs);
+}
+
+async function fetchMeta(addr) {
+  try {
+    const sym = await rpc("eth_call", [{ to: addr, data: SELECTOR_SYMBOL }, "latest"]);
+    const symbol = decodeAbiString(sym).trim();
+    let name = "", decimals = 18;
+    try {
+      const n = await rpc("eth_call", [{ to: addr, data: SELECTOR_NAME }, "latest"]);
+      name = decodeAbiString(n).trim();
+    } catch (e) {}
+    try {
+      const d = await rpc("eth_call", [{ to: addr, data: SELECTOR_DECIMALS }, "latest"]);
+      decimals = decodeAbiUint8(d);
+    } catch (e) {}
+    return { symbol, name, decimals, ok: !!symbol };
+  } catch (e) {
+    return { symbol: "", name: "", decimals: 18, ok: false, error: e.message };
+  }
+}
+
+async function fetchMetaParallel(addrs, maxWorkers = 6, onProgress) {
+  const result = {};
+  let done = 0;
+  for (let i = 0; i < addrs.length; i += maxWorkers) {
+    const batch = addrs.slice(i, i + maxWorkers);
+    const out = await Promise.all(batch.map(fetchMeta));
+    batch.forEach((a, j) => { result[a] = out[j]; });
+    done += batch.length;
+    if (onProgress) onProgress({ done, total: addrs.length });
+  }
+  return result;
+}
+
+// ============ DOM helpers ============
+const $ = (id) => document.getElementById(id);
+const chat = $("chat");
+
+function setStatus(text, isError = false) {
+  const el = $("status");
+  el.style.display = text ? "flex" : "none";
+  el.classList.toggle("error", !!isError);
+  $("statusText").textContent = text;
+}
+
+function addMsg(role, html) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  const av = document.createElement("div");
+  av.className = "avatar";
+  av.textContent = role === "user" ? "U" : "P";
+  const bu = document.createElement("div");
+  bu.className = "bubble";
+  bu.innerHTML = html;
+  div.appendChild(av); div.appendChild(bu);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return bu;
+}
+
+function addTyping() {
+  const div = document.createElement("div");
+  div.className = "msg assistant typing";
+  const av = document.createElement("div");
+  av.className = "avatar"; av.textContent = "P";
+  const bu = document.createElement("div");
+  bu.className = "bubble";
+  bu.textContent = "PSCD is scanning Pharos mainnet…";
+  div.appendChild(av); div.appendChild(bu);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function shortenAddr(a) {
+  return a ? `${a.slice(0, 10)}…${a.slice(-6)}` : "";
+}
+
+function tokenCardHTML(c) {
+  return `
+    <div class="token-card">
+      <div class="tc-stripe"></div>
+      <div class="tc-body">
+        <div class="tc-head">
+          <div>
+            <div class="tc-symbol">${c.symbol || "?"}</div>
+            <div class="tc-name">${c.name || "— unnamed —"}</div>
+          </div>
+          <div class="tc-seal">FOUND<br>ON CHAIN</div>
+        </div>
+        <div class="tc-grid">
+          <div class="tc-grid-item"><div class="k">Decimals</div><div class="v">${c.decimals}</div></div>
+          <div class="tc-grid-item"><div class="k">Address</div><div class="v">${shortenAddr(c.address)}</div></div>
+        </div>
+        <div class="tc-foot">
+          <span class="stamp">Deployed on Pharos Pacific</span>
+          <a class="explorer" href="https://www.pharosscan.xyz/token/${c.address}" target="_blank" rel="noopener">view ↗</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderReport({ candidate, normalized, fromBlock, toBlock, tokensSeen, tokensOk, verdict, verdictMsg, collisions }) {
+  let banner = "";
+  let body = "";
+  if (verdict === "CLEAR") {
+    banner = `<div class="verdict-banner verdict-clear"><span class="vbig">✓</span><span><strong>CLEAR</strong> — no token uses "${escapeHtml(candidate)}" in the scanned range</span></div>`;
+    body = `
+      <div class="empty-state">
+        <div class="check">✓</div>
+        <div class="ok-title">No collision</div>
+        <div>No token on Pharos Pacific uses the symbol <code>${escapeHtml(candidate)}</code><br>in the scanned block range.</div>
+        <div class="ok-sub">Tokens seen: ${tokensSeen} · readable: ${tokensOk} · blocks: ${fromBlock.toLocaleString()} → ${toBlock.toLocaleString()}</div>
+      </div>
+      <div class="recommend">
+        You're clear to deploy — but consider re-running with <strong>--max-blocks 100000</strong> to check a longer window before mainnet launch.
+      </div>
+    `;
+  } else if (verdict === "COLLISION") {
+    banner = `<div class="verdict-banner verdict-collision"><span class="vbig">⚠</span><span><strong>COLLISION</strong> — ${collisions.length} token${collisions.length === 1 ? "" : "s"} use "${escapeHtml(candidate)}"</span></div>`;
+    const cards = collisions.map(tokenCardHTML).join("");
+    body = `
+      <div class="collisions">${cards}</div>
+      <div class="recommend">
+        <strong>Don't deploy this symbol.</strong> Pick a substitute (e.g. <code>${escapeHtml(candidate)}2</code>, <code>${escapeHtml(candidate)}X</code>) or check the existing tokens on <a href="https://www.pharosscan.xyz" target="_blank" rel="noopener">pharosscan</a> — if any is an impersonator, report it.
+      </div>
+    `;
+  } else if (verdict === "EMPTY") {
+    banner = `<div class="verdict-banner verdict-empty"><span class="vbig">—</span><span><strong>EMPTY</strong> — please provide a symbol</span></div>`;
+    body = `<p style="color: var(--ink-soft); font-style: italic;">Provide a candidate symbol above and click <strong>Check symbol</strong>.</p>`;
+  }
+  return `
+    ${banner}
+    <div class="report">
+      <div class="report-headline">
+        <div class="meta-grid">
+          <div class="meta-item"><div class="k">Network</div><div class="v">Pacific (1672)</div></div>
+          <div class="meta-item"><div class="k">Candidate</div><div class="v">${escapeHtml(candidate)} <span style="color: var(--ink-faint); font-size: 11px;">(norm: ${escapeHtml(normalized)})</span></div></div>
+          <div class="meta-item"><div class="k">Block range</div><div class="v">${fromBlock.toLocaleString()} → ${toBlock.toLocaleString()}</div></div>
+          <div class="meta-item"><div class="k">Tokens seen</div><div class="v">${tokensSeen} (ok: ${tokensOk})</div></div>
+        </div>
+      </div>
+      ${body}
+    </div>
+    <p class="meta">Want this as a tool in your AI agent? <a href="https://github.com/ruzkypazzy/Pharos-Symbol-Collision-Detector-PSCD-/blob/main/SKILL.md" target="_blank" rel="noopener">Copy SKILL.md</a> and ask: "is <code>${escapeHtml(candidate)}</code> taken on Pharos?"</p>
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+// ============ main flow ============
+async function runCheck() {
+  const sym = $("sym").value.trim();
+  if (!sym) {
+    addMsg("assistant", `<p>That symbol is empty. Type a candidate like <code>SKP</code> or <code>USDC</code> and click <strong>Check symbol</strong>.</p>`);
+    return;
+  }
+  const depth = parseInt($("depth").value, 10);
+  const depthLabel = depth === 0 ? "FULL chain (~9.6M blocks, ~3 min)"
+                       : depth === 5000 ? "fast (5,000 blocks, ~5s)"
+                       : depth === 10000 ? "medium (10,000 blocks, ~10s)"
+                       : `deep (${depth.toLocaleString()} blocks, ~${Math.round(depth/1000)}s)`;
+
+  addMsg("user", `<p>Check <code>${escapeHtml(sym)}</code> on Pharos Pacific Mainnet, <strong>${depthLabel}</strong>.</p>`);
+
+  const typing = addTyping();
+  setStatus("querying current block…");
+
+  try {
+    const latest = hexToInt(await rpc("eth_blockNumber", []));
+    const toBlock = latest;
+    const fromBlock = depth === 0 ? 0 : Math.max(0, latest - depth);
+
+    setStatus(`scanning blocks ${fromBlock.toLocaleString()} → ${toBlock.toLocaleString()}…`);
+    const addrs = await scanTokens(fromBlock, toBlock, 1000, (p) => {
+      setStatus(`scanning ${p.scanned.toLocaleString()}/${p.total.toLocaleString()} blocks (${p.pct.toFixed(0)}%) — ${p.tokens} tokens — ETA ${p.eta.toFixed(0)}s`);
+    });
+
+    setStatus(`fetching symbol/name/decimals for ${addrs.length} candidates…`);
+    const metas = await fetchMetaParallel(addrs, 6, (p) => {
+      setStatus(`fetching meta ${p.done}/${p.total}…`);
+    });
+
+    const target = normalize(sym);
+    const collisions = [];
+    for (const a of addrs) {
+      const m = metas[a];
+      if (m && m.ok && normalize(m.symbol) === target && target) {
+        collisions.push({ address: a, symbol: m.symbol, name: m.name, decimals: m.decimals });
+      }
+    }
+
+    let verdict, verdictMsg;
+    if (!sym) { verdict = "EMPTY"; verdictMsg = "empty candidate"; }
+    else if (collisions.length === 0) { verdict = "CLEAR"; verdictMsg = "no collision"; }
+    else { verdict = "COLLISION"; verdictMsg = `${collisions.length} collision(s)`; }
+
+    typing.remove();
+    addMsg("assistant", renderReport({
+      candidate: sym, normalized: target, fromBlock, toBlock,
+      tokensSeen: addrs.length,
+      tokensOk: Object.values(metas).filter(m => m.ok).length,
+      verdict, verdictMsg, collisions,
+    }));
+    setStatus("");
+  } catch (err) {
+    console.error(err);
+    typing.remove();
+    addMsg("assistant", `<p><strong style="color: var(--ribbon-red);">Scan failed:</strong> ${err.message}</p><p style="color: var(--ink-faint); font-size: 12px;">The Pharos RPC may be down or rate-limited. Try a smaller <strong>Scan depth</strong> from the dropdown, or retry in a moment.</p>`);
+    setStatus("");
+  }
+}
+
+document.getElementById("run").addEventListener("click", runCheck);
+document.getElementById("sym").addEventListener("keydown", (e) => { if (e.key === "Enter") runCheck(); });
+document.getElementById("clear").addEventListener("click", () => {
+  chat.innerHTML = "";
+  addMsg("assistant", `<p>Cleared. Give me another candidate symbol and I'll check it.</p>`);
+});
+document.querySelectorAll(".chip").forEach(c => {
+  c.addEventListener("click", () => { $("sym").value = c.dataset.sym; runCheck(); });
+});
+</script>
+</body>
+</html>
